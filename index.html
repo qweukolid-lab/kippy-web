@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kippy AI</title>
+    <!-- Скрипт Telegram -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Иконки -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        :root {
+            --bg: #000000;
+            --card: #121212;
+            --card-hover: #1e1e1e;
+            --accent: #ff4b4b;
+            --accent-glow: rgba(255, 75, 75, 0.3);
+            --text: #ffffff;
+            --text-muted: #888888;
+            --border: #2a2a2a;
+            --gold: #fbbf24;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        body { background-color: var(--bg); color: var(--text); padding-bottom: 90px; overflow-x: hidden; }
+
+        /* Анимации */
+        .tab-content { display: none; animation: fadeIn 0.25s ease-out forwards; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Приветственное окно (без данных) */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-content { background: var(--card); border: 1px solid var(--accent); border-radius: 24px; padding: 25px; width: 90%; max-width: 400px; text-align: center; position: relative; box-shadow: 0 0 30px var(--accent-glow); }
+        .modal-content h2 { margin-bottom: 10px; font-size: 22px; }
+        .modal-content p { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+        .close-modal { position: absolute; top: 15px; right: 15px; font-size: 24px; color: var(--text-muted); cursor: pointer; }
+
+        /* Профиль */
+        .profile-container { padding: 15px; }
+        .profile-top { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
+        .profile-avatar { width: 85px; height: 85px; border-radius: 50%; background: #1a1a1a; display: flex; justify-content: center; align-items: center; font-size: 40px; position: relative; border: 2px solid var(--accent); flex-shrink: 0; }
+        .profile-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+        .status-dot { position: absolute; bottom: 2px; right: 2px; width: 16px; height: 16px; background: #4ade80; border-radius: 50%; border: 3px solid var(--bg); }
+        
+        .profile-name-area h2 { font-size: 22px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .profile-id { color: var(--text-muted); font-size: 14px; }
+
+        /* 4 Виджета (Отправка сигналов боту) */
+        .inventory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+        .inv-item { background: #1a1a1a; border-radius: 16px; padding: 15px 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; text-align: center; border: 1px solid var(--border); }
+        .inv-item:active { transform: scale(0.95); }
+        .inv-item i { font-size: 28px; margin-bottom: 8px; }
+        .inv-item .val { font-size: 14px; font-weight: bold; color: white; margin-bottom: 2px; }
+        .inv-item span { font-size: 11px; color: var(--text-muted); }
+
+        /* Вкладки */
+        .profile-tabs { display: flex; background: #1a1a1a; border-radius: 30px; padding: 5px; margin-bottom: 15px; }
+        .p-tab { flex: 1; text-align: center; padding: 10px 0; font-size: 14px; font-weight: 600; color: var(--text-muted); border-radius: 25px; cursor: pointer; }
+        .p-tab.active { background: #2a2a2a; color: white; }
+        
+        .sub-tabs { display: flex; gap: 10px; margin-bottom: 15px; overflow-x: auto; }
+        .sub-tab { background: #1a1a1a; border: 1px solid var(--border); padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; color: var(--text-muted); white-space: nowrap; cursor: pointer; }
+        .sub-tab.active { background: white; color: black; border-color: white; }
+
+        /* Сетка ботов */
+        .bots-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .bot-card { background: #1a1a1a; border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 3/4; display: flex; flex-direction: column; justify-content: flex-end; padding: 10px; border: 1px solid var(--border); cursor: pointer; }
+        .bot-card img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.6; z-index: 0; }
+        .bot-card-info { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; }
+        .bot-card-info h4 { font-size: 14px; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%; }
+
+        /* Пустые состояния */
+        .empty-state { text-align: center; color: var(--text-muted); padding: 40px 20px; grid-column: 1 / -1; font-size: 14px; }
+        .empty-state i { font-size: 40px; margin-bottom: 10px; opacity: 0.5; }
+
+        /* Чаты */
+        .chats-top { padding: 15px; font-size: 20px; font-weight: bold; }
+        .chat-list { padding: 0 15px; }
+        .chat-row { display: flex; align-items: center; gap: 15px; padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer; position: relative; }
+        .chat-row img { width: 55px; height: 55px; border-radius: 50%; object-fit: cover; }
+        .chat-row-info { flex: 1; }
+        .chat-row-info h4 { font-size: 16px; margin-bottom: 4px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+        .chat-row-info p { font-size: 14px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+        
+        .chat-menu-popup { position: absolute; right: 15px; top: 50px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: none; z-index: 10; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .chat-menu-popup div { padding: 10px 15px; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .chat-menu-popup div:active { background: var(--card-hover); }
+        .chat-menu-popup .delete { color: var(--accent); }
+
+        /* Внутри чата */
+        .chat-inner { display: flex; flex-direction: column; height: 100vh; padding-bottom: 80px; }
+        .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 15px; background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+        .chat-header img { width: 40px; height: 40px; border-radius: 50%; }
+        .chat-header-info { display: flex; align-items: center; gap: 10px; }
+        .chat-header-info h4 { font-size: 16px; }
+        .chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 80%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.4; }
+        .msg.bot { background: var(--card-hover); align-self: flex-start; border-bottom-left-radius: 4px; }
+        .msg.user { background: var(--accent); align-self: flex-end; border-bottom-right-radius: 4px; color: white; }
+        .chat-input-area { position: fixed; bottom: 70px; left: 0; width: 100%; padding: 10px 15px; background: var(--bg); display: flex; gap: 10px; border-top: 1px solid var(--border); }
+        .chat-input { flex: 1; background: #1a1a1a; border: 1px solid var(--border); border-radius: 20px; padding: 12px 15px; color: white; outline: none; }
+        .send-btn { background: var(--accent); border: none; border-radius: 50%; width: 45px; height: 45px; color: white; font-size: 20px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+
+        /* Магазин */
+        .shop-screen { padding: 20px; }
+        .shop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .sub-tabs-shop { display: flex; background: #1a1a1a; border-radius: 20px; padding: 5px; margin-bottom: 20px; }
+        .sub-tab-shop { flex: 1; text-align: center; padding: 12px 0; font-size: 15px; font-weight: 600; color: var(--text-muted); border-radius: 15px; cursor: pointer; }
+        .sub-tab-shop.active { background: #2a2a2a; color: white; }
+        .sub-prices { display: flex; gap: 10px; margin-bottom: 25px; }
+        .sub-price-card { flex: 1; background: #1a1a1a; border-radius: 16px; padding: 15px 5px; text-align: center; border: 1px solid transparent; position: relative; cursor: pointer; }
+        .sub-price-card.active { border-color: var(--accent); background: rgba(255, 75, 75, 0.05); }
+        .sub-price-card .badge { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--accent); color: white; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+        .sub-price-card .period { font-size: 12px; color: var(--text-muted); margin-bottom: 5px; }
+        .sub-price-card .price { font-size: 16px; font-weight: bold; }
+        .sub-features { display: flex; flex-direction: column; margin-bottom: 25px; background: #121212; border-radius: 20px; padding: 0 15px; }
+        .sub-feature-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; border-bottom: 1px solid #222; padding: 15px 0; }
+        .btn-action { background: var(--accent); color: white; border: none; border-radius: 16px; padding: 16px; width: 100%; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px var(--accent-glow); margin-bottom: 12px; }
+        .btn-action:active { transform: scale(0.98); }
+        
+        /* Создание */
+        .create-screen { padding: 20px; }
+        .input-field { width: 100%; background: #1a1a1a; border: 1px solid var(--border); border-radius: 16px; padding: 15px; color: white; font-size: 15px; outline: none; margin-bottom: 15px; }
+        .input-field:focus { border-color: var(--accent); }
+
+        /* Нижнее меню */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 75px; background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(15px); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; z-index: 100; padding-bottom: 10px; }
+        .nav-item { color: var(--text-muted); font-size: 26px; display: flex; justify-content: center; align-items: center; width: 50px; height: 50px; cursor: pointer; transition: 0.2s; border-radius: 12px; }
+        .nav-item.active { color: var(--accent); }
+        .nav-plus { width: 56px; height: 56px; background: var(--accent); border-radius: 16px; display: flex; justify-content: center; align-items: center; color: white; font-size: 28px; cursor: pointer; box-shadow: 0 0 20px var(--accent-glow); margin-top: -15px; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- МОДАЛЬНОЕ ОКНО ПРИ ВХОДЕ -->
+    <div id="welcome-modal" class="modal-overlay">
+        <div class="modal-content">
+            <i class="ph ph-x close-modal" onclick="document.getElementById('welcome-modal').style.display='none'"></i>
+            <h2>Добро пожаловать в Kippy AI!</h2>
+            <p>Создавай уникальных ботов, общайся и зарабатывай монеты.</p>
+            <button class="btn-action" onclick="switchTab('shop'); document.getElementById('welcome-modal').style.display='none'">Перейти в магазин</button>
+            <button class="btn-action" style="background: transparent; border: 1px solid var(--border); color: white; box-shadow: none;" onclick="document.getElementById('welcome-modal').style.display='none'">Позже</button>
+        </div>
+    </div>
+
+    <!-- ПРОФИЛЬ -->
+    <div id="tab-profile" class="tab-content active">
+        <div class="profile-container">
+            <div class="profile-top">
+                <div class="profile-avatar">
+                    <img id="prof-avatar" src="" style="display:none;">
+                    <span id="prof-initial">U</span>
+                    <div class="status-dot"></div>
+                </div>
+                <div class="profile-name-area">
+                    <h2 id="prof-name">Загрузка...</h2>
+                    <div class="profile-id" id="prof-username">...</div>
+                </div>
+            </div>
+
+            <div class="inventory-grid">
+                <div class="inv-item" onclick="sendAction('get_pro')">
+                    <i class="ph-fill ph-diamond" style="color: var(--accent);"></i>
+                    <div class="val">PRO</div>
+                    <span>Подписка</span>
+                </div>
+                <div class="inv-item" onclick="sendAction('get_coins')">
+                    <i class="ph-fill ph-coin" style="color: var(--gold);"></i>
+                    <div class="val" id="balance-coins">0</div>
+                    <span>Монеты</span>
+                </div>
+                <div class="inv-item" onclick="sendAction('get_ref')">
+                    <i class="ph-fill ph-envelope-simple" style="color: #ec4899;"></i>
+                    <div class="val">Пригласить</div>
+                    <span>+100 монет</span>
+                </div>
+                <div class="inv-item" onclick="sendAction('get_income')">
+                    <i class="ph-fill ph-chart-line-up" style="color: #3b82f6;"></i>
+                    <div class="val" id="balance-income">0</div>
+                    <span>Доходы</span>
+                </div>
+            </div>
+
+            <div class="profile-tabs">
+                <div class="p-tab active">AI-боты</div>
+                <div class="p-tab">Избранное</div>
+            </div>
+
+            <div class="sub-tabs">
+                <div class="sub-tab active">Все</div>
+                <div class="sub-tab">Публичные</div>
+                <div class="sub-tab">Приватные</div>
+            </div>
+
+            <!-- Пустая сетка (сюда бот будет кидать ботов через JS) -->
+            <div class="bots-grid" id="profile-bots-container">
+                <div class="empty-state">
+                    <i class="ph ph-robot"></i><br>
+                    У вас пока нет ботов.<br>Нажмите "+", чтобы создать.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ПОИСК -->
+    <div id="tab-search" class="tab-content">
+        <div style="padding: 15px;">
+            <input type="text" class="input-field" placeholder="Поиск ботов..." style="border-radius: 20px;">
+        </div>
+        <div class="profile-tabs" style="margin: 0 15px 15px 15px;">
+            <div class="p-tab active">Для вас</div>
+            <div class="p-tab">Избранное</div>
+        </div>
+        <!-- Пустая сетка для поиска -->
+        <div class="bots-grid" style="padding: 0 15px;" id="search-bots-container">
+            <div class="empty-state">
+                <i class="ph ph-magnifying-glass"></i><br>
+                Ботов пока нет.
+            </div>
+        </div>
+    </div>
+
+    <!-- ЧАТЫ -->
+    <div id="tab-chats" class="tab-content">
+        <div class="chats-top">Чаты</div>
+        <div class="chat-list" id="chats-container">
+            <!-- Только официальная поддержка, остальное загрузит JS -->
+            <div class="chat-row" onclick="sendAction('open_support')">
+                <img src="https://ui-avatars.com/api/?name=K&background=ff4b4b&color=fff">
+                <div class="chat-row-info">
+                    <h4>Kippy Support <i class="ph-fill ph-patch-check" style="color: #ff4b4b; font-size: 14px;"></i></h4>
+                    <p>Служба поддержки.</p>
+                </div>
+            </div>
+            <div class="empty-state" style="padding:20px 0; border:none;">
+                Остальные чаты появятся здесь.
+            </div>
+        </div>
+    </div>
+
+    <!-- ВНУТРИ ЧАТА (Пустой каркас) -->
+    <div id="tab-chat-inner" class="tab-content chat-inner">
+        <div class="chat-header">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <i class="ph ph-arrow-left" onclick="switchTab('chats')" style="font-size:24px; cursor:pointer;"></i>
+                <div class="chat-header-info">
+                    <img id="chat-avatar" src="https://ui-avatars.com/api/?name=U&background=333&color=fff">
+                    <h4 id="chat-name">Загрузка...</h4>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Контейнер для сообщений (пустой) -->
+        <div class="chat-messages" id="chat-messages-container">
+            <div class="empty-state">Начните диалог...</div>
+        </div>
+
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" id="chat-input-field" placeholder="Введите сообщение...">
+            <button class="send-btn" onclick="sendMessageToBot()"><i class="ph ph-arrow-up"></i></button>
+        </div>
+    </div>
+
+    <!-- ЭКРАН ПОДПИСКИ -->
+    <div id="tab-shop" class="tab-content shop-screen">
+        <div class="shop-header">
+            <i class="ph ph-arrow-left" onclick="switchTab('profile')" style="font-size:24px; cursor:pointer;"></i>
+            <div style="background:#1a1a1a; padding:8px 15px; border-radius:20px; display:flex; align-items:center; gap:5px;">
+                <i class="ph-fill ph-coin" style="color: var(--gold);"></i> <span id="shop-balance">0</span> монет
+            </div>
+        </div>
+        
+        <div class="sub-tabs-shop">
+            <div class="sub-tab-shop">Max</div>
+            <div class="sub-tab-shop active">Pro</div>
+        </div>
+
+        <div class="sub-prices">
+            <div class="sub-price-card">
+                <div class="period">В месяц</div>
+                <div class="price">150 ₽</div>
+            </div>
+            <div class="sub-price-card active">
+                <div class="badge">🔥 Hot</div>
+                <div class="period">В неделю</div>
+                <div class="price">50 ₽</div>
+            </div>
+            <div class="sub-price-card">
+                <div class="period">В год</div>
+                <div class="price">990 ₽</div>
+            </div>
+        </div>
+
+        <div class="sub-features">
+            <div class="sub-feature-row"><div class="feature-name"><i class="ph ph-brain"></i> Память х5</div><div class="check">✓</div></div>
+            <div class="sub-feature-row"><div class="feature-name"><i class="ph ph-chat-centered-text"></i> Длинные ответы</div><div class="check">✓</div></div>
+            <div class="sub-feature-row"><div class="feature-name"><i class="ph ph-prohibit"></i> Без рекламы</div><div class="check">✓</div></div>
+        </div>
+
+        <button class="btn-action" onclick="sendAction('buy_pro', 'week')">Подписаться за 50 ₽</button>
+        
+        <div style="margin-top:20px; border-top:1px solid var(--border); padding-top:20px;">
+            <h3 style="margin-bottom:15px;">Покупка токенов</h3>
+            <button class="btn-action" onclick="sendAction('buy_tokens', '50k')">50 000 токенов - 150 ₽</button>
+            <button class="btn-action" onclick="sendAction('buy_tokens', '100k')">100 000 токенов - 250 ₽</button>
+        </div>
+    </div>
+
+    <!-- СОЗДАНИЕ -->
+    <div id="tab-create" class="tab-content create-screen">
+        <h2 style="margin-bottom: 20px;">Создать бота</h2>
+        
+        <p style="color: #888; margin-bottom: 5px; font-size: 14px;">Имя персонажа</p>
+        <input type="text" class="input-field" id="create-name" placeholder="Введите имя">
+        
+        <p style="color: #888; margin-bottom: 5px; font-size: 14px;">Промт (Характер)</p>
+        <textarea class="input-field" id="create-prompt" rows="3" placeholder="Опишите бота..."></textarea>
+
+        <p style="color: #888; margin-bottom: 5px; font-size: 14px;">Кто может это видеть?</p>
+        <select class="input-field" id="create-type">
+            <option value="public">Публичный</option>
+            <option value="private">Личный</option>
+        </select>
+
+        <button class="btn-action" style="margin-top: 20px;" onclick="createBot()">Опубликовать</button>
+    </div>
+
+    <!-- НИЖНЕЕ МЕНЮ -->
+    <div class="bottom-nav">
+        <div class="nav-item" id="nav-search" onclick="switchTab('search')"><i class="ph ph-house"></i></div>
+        <div class="nav-item" id="nav-chats" onclick="switchTab('chats')"><i class="ph ph-chat-circle-dots"></i></div>
+        <div class="nav-plus" onclick="switchTab('create')"><i class="ph ph-plus"></i></div>
+        <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="ph ph-user"></i></div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.setHeaderColor('#000000');
+        tg.setBackgroundColor('#000000');
+
+        // Данные из профиля Telegram (для отображения)
+        const user = tg.initDataUnsafe?.user;
+        if (user) {
+            document.getElementById('prof-name').innerText = user.first_name || "Пользователь";
+            document.getElementById('prof-username').innerText = user.username ? '@' + user.username : 'ID: ' + user.id;
+            if (user.photo_url) {
+                document.getElementById('prof-avatar').src = user.photo_url;
+                document.getElementById('prof-avatar').style.display = 'block';
+                document.getElementById('prof-initial').style.display = 'none';
+            } else {
+                document.getElementById('prof-initial').innerText = (user.first_name || "U").charAt(0);
+            }
+        }
+
+        // Отправка команд боту (БЕЗ СЕКРЕТОВ)
+        function sendAction(action, payload = null) {
+            tg.HapticFeedback.impactOccurred('light');
+            const data = { action: action };
+            if (payload) data.payload = payload;
+            
+            // Отправляем сигнал серверу
+            tg.sendData(JSON.stringify(data));
+            
+            if (action === 'get_ref') tg.showAlert('Запрос на реферальную ссылку отправлен в чат!');
+            if (action === 'buy_pro') tg.showAlert('Запрос на подписку отправлен!');
+        }
+
+        // Отправка сообщения из чата
+        function sendMessageToBot() {
+            const input = document.getElementById('chat-input-field');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            // Визуально добавляем сообщение в чат
+            const container = document.getElementById('chat-messages-container');
+            if (container.querySelector('.empty-state')) container.innerHTML = '';
+            
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'msg user';
+            msgDiv.innerText = text;
+            container.appendChild(msgDiv);
+            input.value = '';
+            
+            // Отправляем команду боту
+            sendAction('send_message', text);
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            if(tabId === 'profile') document.getElementById('nav-profile').classList.add('active');
+            if(tabId === 'chats' || tabId === 'chat-inner') document.getElementById('nav-chats').classList.add('active');
+            if(tabId === 'search') document.getElementById('nav-search').classList.add('active');
+            
+            tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // Создание бота (собираем данные и шлем боту)
+        function createBot() {
+            const name = document.getElementById('create-name').value;
+            const prompt = document.getElementById('create-prompt').value;
+            const type = document.getElementById('create-type').value;
+            
+            if(!name || !prompt) {
+                return tg.showAlert("Заполните все поля!");
+            }
+            
+            sendAction('create_bot', { name: name, prompt: prompt, type: type });
+            tg.showAlert('Запрос на создание бота отправлен!');
+            
+            // Очищаем поля
+            document.getElementById('create-name').value = '';
+            document.getElementById('create-prompt').value = '';
+            switchTab('profile');
+        }
+    </script>
+</body>
+</html>
