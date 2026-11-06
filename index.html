@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kippy AI</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        :root {
+            --bg: #000000;
+            --card: #121212;
+            --card-hover: #1e1e1e;
+            --accent: #ff4b4b; /* Красный */
+            --accent-glow: rgba(255, 75, 75, 0.3);
+            --text: #ffffff;
+            --text-muted: #888888;
+            --border: #2a2a2a;
+            --gold: #fbbf24;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        body { background-color: var(--bg); color: var(--text); padding-bottom: 90px; overflow-x: hidden; }
+
+        /* Анимации */
+        .tab-content { display: none; animation: fadeIn 0.25s ease-out forwards; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ================= ПРОФИЛЬ (ТОЧЬ-В-ТОЧЬ КАК НА СКРИНЕ 1) ================= */
+        .profile-container { padding: 15px; }
+        
+        /* Верх: Аватар, Ник, Юз */
+        .profile-top { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+        .profile-avatar { width: 85px; height: 85px; border-radius: 50%; background: #1a1a1a; display: flex; justify-content: center; align-items: center; font-size: 40px; position: relative; border: 2px solid var(--border); flex-shrink: 0; }
+        .profile-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+        .status-dot { position: absolute; bottom: 4px; right: 4px; width: 14px; height: 14px; background: #4ade80; border-radius: 50%; border: 2px solid var(--bg); }
+        
+        .profile-name-area h2 { font-size: 22px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 5px;}
+        .profile-name-area h2 i { color: var(--text-muted); font-size: 16px; }
+        .profile-id { color: var(--text-muted); font-size: 13px; display: flex; align-items: center; gap: 5px; }
+        .status-pill { background: #0f2e16; color: #4ade80; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; }
+
+        /* Статистика (Подписки, Подписчики, Просмотры) */
+        .profile-stats { display: flex; gap: 30px; margin-bottom: 15px; }
+        .stat-item { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-item span { font-weight: bold; font-size: 20px; color: var(--text); margin-bottom: 2px; text-transform: none; letter-spacing: normal;}
+
+        /* Био и теги */
+        .profile-bio { font-size: 14px; color: var(--text); margin-bottom: 15px; line-height: 1.4; }
+        .profile-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px; }
+        .tag { background: #1a1a1a; padding: 6px 12px; border-radius: 20px; font-size: 13px; display: flex; align-items: center; gap: 5px; color: var(--text-muted); }
+
+        /* Уровни */
+        .levels-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        .level-badge { background: #1a1a1a; border: 1px solid var(--border); padding: 8px 15px; border-radius: 12px; font-size: 14px; display: flex; align-items: center; gap: 5px; }
+
+        /* 4 Виджета */
+        .inventory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; }
+        .inv-item { background: #1a1a1a; border-radius: 16px; padding: 15px 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; text-align: center; border: 1px solid var(--border); }
+        .inv-item:active { transform: scale(0.95); }
+        .inv-item i { font-size: 28px; margin-bottom: 8px; }
+        .inv-item .val { font-size: 14px; font-weight: bold; color: white; margin-bottom: 2px; }
+        .inv-item span { font-size: 11px; color: var(--text-muted); }
+
+        /* Меню иконок */
+        .action-menu { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+        .act-btn { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); }
+        .act-btn i { font-size: 24px; color: white; }
+
+        /* Вкладки (Пост, АИ-боты, Новелла) */
+        .profile-tabs { display: flex; background: #1a1a1a; border-radius: 30px; padding: 5px; margin-bottom: 15px; }
+        .p-tab { flex: 1; text-align: center; padding: 10px 0; font-size: 14px; font-weight: 600; color: var(--text-muted); border-radius: 25px; cursor: pointer; }
+        .p-tab.active { background: #2a2a2a; color: white; }
+        
+        /* Подвкладки (Все, Публичные, Приватные) */
+        .sub-tabs { display: flex; gap: 10px; margin-bottom: 15px; overflow-x: auto; }
+        .sub-tab { background: #1a1a1a; border: 1px solid var(--border); padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; color: var(--text-muted); white-space: nowrap; cursor: pointer; }
+        .sub-tab.active { background: white; color: black; border-color: white; }
+
+        /* Сетка ботов (Пустая, готова к заполнению) */
+        .bots-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .bot-card { background: #1a1a1a; border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 3/4; display: flex; flex-direction: column; justify-content: flex-end; padding: 10px; border: 1px solid var(--border); cursor: pointer; }
+        .bot-card img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.6; z-index: 0; }
+        .bot-card-info { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; }
+        .bot-card-info h4 { font-size: 14px; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%; }
+
+        /* ================= ЭКРАН ПОДПИСКИ (КАК НА СКРИНЕ 2) ================= */
+        .shop-screen { padding: 20px; }
+        .shop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .shop-header i { font-size: 26px; cursor: pointer; }
+        .coin-pill { background: #1a1a1a; padding: 8px 15px; border-radius: 20px; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: bold; }
+        
+        .sub-tabs-shop { display: flex; background: #1a1a1a; border-radius: 20px; padding: 5px; margin-bottom: 20px; }
+        .sub-tab-shop { flex: 1; text-align: center; padding: 12px 0; font-size: 15px; font-weight: 600; color: var(--text-muted); border-radius: 15px; cursor: pointer; }
+        .sub-tab-shop.active { background: #2a2a2a; color: white; }
+
+        .sub-prices { display: flex; gap: 10px; margin-bottom: 25px; }
+        .sub-price-card { flex: 1; background: #1a1a1a; border-radius: 16px; padding: 15px 5px; text-align: center; border: 1px solid transparent; position: relative; cursor: pointer; }
+        .sub-price-card.active { border-color: var(--accent); background: rgba(255, 75, 75, 0.05); }
+        .sub-price-card .badge { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--accent); color: white; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+        .sub-price-card .period { font-size: 12px; color: var(--text-muted); margin-bottom: 5px; }
+        .sub-price-card .price { font-size: 16px; font-weight: bold; }
+        .sub-price-card .old-price { font-size: 12px; color: #555; text-decoration: line-through; }
+        
+        .sub-features { display: flex; flex-direction: column; margin-bottom: 25px; background: #121212; border-radius: 20px; padding: 0 15px; }
+        .sub-feature-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; border-bottom: 1px solid #222; padding: 15px 0; }
+        .sub-feature-row:last-child { border-bottom: none; }
+        .sub-feature-row .feature-name { display: flex; align-items: center; gap: 10px; color: var(--text); }
+        .sub-feature-row .check { color: var(--accent); font-weight: bold; font-size: 18px; }
+        
+        .btn-action { background: var(--accent); color: white; border: none; border-radius: 16px; padding: 16px; width: 100%; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px var(--accent-glow); margin-bottom: 12px; }
+        .btn-action:active { transform: scale(0.98); }
+
+        /* ================= ЧАТЫ (КАК НА СКРИНЕ 3) ================= */
+        .chats-top { display: flex; justify-content: space-between; align-items: center; padding: 15px; }
+        .chat-tabs { display: flex; gap: 20px; font-size: 18px; font-weight: 700; }
+        .chat-tab { color: var(--text-muted); cursor: pointer; padding-bottom: 2px; }
+        .chat-tab.active { color: var(--text); border-bottom: 2px solid var(--accent); }
+        .chat-header-icons { display: flex; gap: 15px; font-size: 24px; }
+        
+        .chat-list { padding: 0 15px; }
+        .chat-row { display: flex; align-items: center; gap: 15px; padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer; position: relative; }
+        .chat-row img { width: 55px; height: 55px; border-radius: 50%; object-fit: cover; }
+        .chat-row-info { flex: 1; }
+        .chat-row-info h4 { font-size: 16px; margin-bottom: 4px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+        .chat-row-info p { font-size: 14px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+
+        /* ================= СОЗДАНИЕ (КАК НА СКРИНЕ 5) ================= */
+        .create-screen { padding: 20px; }
+        .create-header { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; font-size: 20px; font-weight: bold; }
+        .create-header i { font-size: 24px; cursor: pointer; }
+        
+        .upload-box { border: 2px dashed var(--border); border-radius: 16px; height: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-muted); margin-bottom: 20px; cursor: pointer; }
+        .upload-box i { font-size: 40px; margin-bottom: 10px; }
+        
+        .input-label { color: #888; margin-bottom: 5px; font-size: 14px; }
+        .input-field { width: 100%; background: #1a1a1a; border: 1px solid var(--border); border-radius: 16px; padding: 15px; color: white; font-size: 15px; outline: none; margin-bottom: 15px; }
+        
+        .visibility-options { display: flex; gap: 10px; margin-bottom: 20px; }
+        .vis-option { flex: 1; background: #1a1a1a; border: 1px solid var(--border); padding: 15px; border-radius: 16px; cursor: pointer; }
+        .vis-option.active { border-color: var(--accent); background: rgba(255,75,75,0.05); }
+        .vis-option h4 { font-size: 16px; margin-bottom: 5px; }
+        .vis-option p { font-size: 12px; color: var(--text-muted); }
+
+        /* ================= ВНУТРИ ЧАТА ================= */
+        .chat-inner { display: flex; flex-direction: column; height: 100vh; padding-bottom: 80px; }
+        .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 15px; background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+        .chat-header img { width: 40px; height: 40px; border-radius: 50%; }
+        .chat-header-info { display: flex; align-items: center; gap: 10px; }
+        .chat-header-info h4 { font-size: 16px; }
+        .chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 80%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.4; }
+        .msg.bot { background: var(--card-hover); align-self: flex-start; border-bottom-left-radius: 4px; }
+        .msg.user { background: var(--accent); align-self: flex-end; border-bottom-right-radius: 4px; color: white; }
+        .chat-input-area { position: fixed; bottom: 70px; left: 0; width: 100%; padding: 10px 15px; background: var(--bg); display: flex; gap: 10px; border-top: 1px solid var(--border); }
+        .chat-input { flex: 1; background: #1a1a1a; border: 1px solid var(--border); border-radius: 20px; padding: 12px 15px; color: white; outline: none; }
+        .send-btn { background: var(--accent); border: none; border-radius: 50%; width: 45px; height: 45px; color: white; font-size: 20px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+
+        /* ================= НИЖНЕЕ МЕНЮ ================= */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 75px; background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(15px); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; z-index: 100; padding-bottom: 10px; }
+        .nav-item { color: var(--text-muted); font-size: 26px; display: flex; justify-content: center; align-items: center; width: 50px; height: 50px; cursor: pointer; transition: 0.2s; border-radius: 12px; }
+        .nav-item.active { color: var(--accent); }
+        .nav-plus { width: 56px; height: 56px; background: var(--accent); border-radius: 16px; display: flex; justify-content: center; align-items: center; color: white; font-size: 28px; cursor: pointer; box-shadow: 0 0 20px var(--accent-glow); margin-top: -15px; }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- ПРОФИЛЬ (КАК НА 1 СКРИНЕ) -->
+    <div id="tab-profile" class="tab-content active">
+        <div class="profile-container">
+            <!-- Шапка -->
+            <div class="profile-top">
+                <div class="profile-avatar">
+                    <img id="prof-avatar" src="" style="display:none;">
+                    <span id="prof-initial">U</span>
+                    <div class="status-dot"></div>
+                </div>
+                <div class="profile-name-area">
+                    <h2 id="prof-name">Загрузка... <i class="ph ph-pencil-simple"></i></h2>
+                    <div class="profile-id" id="prof-username">...</div>
+                    <div class="status-pill"><i class="ph ph-planet"></i> Онлайн</div>
+                </div>
+                <i class="ph ph-gear" style="margin-left:auto; font-size: 24px; color: #888;"></i>
+            </div>
+
+            <!-- Статистика -->
+            <div class="profile-stats">
+                <div class="stat-item"><span>0</span>Подписки</div>
+                <div class="stat-item"><span>0</span>Подписчики</div>
+                <div class="stat-item"><span>0</span>Просмотры</div>
+            </div>
+
+            <!-- Био -->
+            <div class="profile-bio">Здесь будет ваше био...</div>
+            
+            <!-- Теги -->
+            <div class="profile-tags">
+                <div class="tag"><i class="ph ph-map-pin"></i> RU</div>
+                <div class="tag">Аниме</div>
+            </div>
+
+            <!-- Уровни -->
+            <div class="levels-row">
+                <div class="level-badge"><i class="ph ph-shield"></i> ур.0</div>
+                <div class="level-badge"><i class="ph ph-heart"></i> ур.0</div>
+            </div>
+
+            <!-- 4 Виджета -->
+            <div class="inventory-grid">
+                <div class="inv-item" onclick="switchTab('shop')">
+                    <i class="ph-fill ph-diamond" style="color: var(--accent);"></i>
+                    <div class="val">Pro</div>
+                    <span>Подписат...</span>
+                </div>
+                <div class="inv-item">
+                    <i class="ph-fill ph-coin" style="color: var(--gold);"></i>
+                    <div class="val">0</div>
+                    <span>Монеты</span>
+                </div>
+                <div class="inv-item" onclick="sendAction('get_ref')">
+                    <i class="ph-fill ph-envelope-simple" style="color: #ec4899;"></i>
+                    <div class="val">Пригласить</div>
+                    <span>+320 монет</span>
+                </div>
+                <div class="inv-item">
+                    <i class="ph-fill ph-diamond" style="color: #3b82f6;"></i>
+                    <div class="val">0</div>
+                    <span>Доходы</span>
+                </div>
+            </div>
+
+            <!-- Меню иконок -->
+            <div class="action-menu">
+                <div class="act-btn"><i class="ph ph-bag" style="color: #d946ef;"></i>Сумка</div>
+                <div class="act-btn"><i class="ph ph-clock-counter-clockwise" style="color: #3b82f6;"></i>История</div>
+                <div class="act-btn"><i class="ph ph-star" style="color: #ff4b4b;"></i>Kippy+</div>
+                <div class="act-btn"><i class="ph ph-gift" style="color: #d946ef;"></i>Стена</div>
+                <div class="act-btn"><i class="ph ph-dots-three"></i>Ещё</div>
+            </div>
+
+            <!-- Вкладки -->
+            <div class="profile-tabs">
+                <div class="p-tab">Пост</div>
+                <div class="p-tab active">AI-боты</div>
+                <div class="p-tab">Новелла</div>
+            </div>
+
+            <!-- Подвкладки -->
+            <div class="sub-tabs">
+                <div class="sub-tab active">Все</div>
+                <div class="sub-tab">Публичные</div>
+                <div class="sub-tab">Приватные</div>
+            </div>
+
+            <!-- Сетка ботов -->
+            <div class="bots-grid">
+                <!-- СЮДА JS БУДЕТ ВСТАВЛЯТЬ РЕАЛЬНЫХ БОТОВ -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН ПОДПИСКИ (КАК НА 2 СКРИНЕ) -->
+    <div id="tab-shop" class="tab-content shop-screen">
+        <div class="shop-header">
+            <i class="ph ph-arrow-left" onclick="switchTab('profile')"></i>
+            <div class="coin-pill">
+                <i class="ph-fill ph-coin" style="color: var(--gold);"></i> <span id="shop-coins">0</span> монет
+            </div>
+        </div>
+        
+        <div class="sub-tabs-shop">
+            <div class="sub-tab-shop">Max</div>
+            <div class="sub-tab-shop active">Pro</div>
+        </div>
+
+        <div class="sub-prices">
+            <div class="sub-price-card">
+                <div class="period">В месяц</div>
+                <div class="price">1 190,00 ₽</div>
+                <div class="old-price">39.67/day</div>
+            </div>
+            <div class="sub-price-card active">
+                <div class="badge">Hot 🔥</div>
+                <div class="period">В неделю</div>
+                <div class="price">449,00 ₽</div>
+            </div>
+            <div class="sub-price-card">
+                <div class="badge">19% OFF</div>
+                <div class="period">В год</div>
+                <div class="price">11 990,00 ₽</div>
+                <div class="old-price">Р14833.17</div>
+            </div>
+        </div>
+
+        <div class="sub-features">
+            <div class="sub-feature-row"><div class="feature-name"><i class="ph ph-brain"></i> Память х5</div><div class="check">✓</div></div>
+            <div class="sub-feature-row"><div class="feature-name"><i class="ph ph-chat-centered-text"></i> Ответы в 2 раза длиннее</div><div class="check">✓</div></div>
+            <div class="sub-feature-row"><div class="feature-name"><i class="ph ph-lightbulb"></i> Умнее</div><div class="check">✓</div></div>
+            <div class="sub-feature-row"><div class="feature-name"><i class="ph ph-prohibit"></i> Без рекламы</div><div class="check">✓</div></div>
+            <div class="sub-feature-row"><div class="feature-name"><i class="ph ph-gift"></i> Бесконечные сообщения</div><div class="check">✓</div></div>
+            <div class="sub-feature-row"><div class="feature-name"><i class="ph ph-percent"></i> Скидки на токены</div><div class="check">10%</div></div>
+        </div>
+
+        <button class="btn-action" onclick="sendAction('buy_pro', 'week')">Подписаться</button>
+        
+        <div style="margin-top:20px; border-top:1px solid var(--border); padding-top:20px;">
+            <h3 style="margin-bottom:15px;">Покупка токенов</h3>
+            <button class="btn-action" onclick="sendAction('buy_tokens', '50k')">50 000 - 150 ₽</button>
+            <button class="btn-action" onclick="sendAction('buy_tokens', '100k')">100 000 - 250 ₽</button>
+        </div>
+    </div>
+
+    <!-- ЧАТЫ (КАК НА 3 СКРИНЕ) -->
+    <div id="tab-chats" class="tab-content">
+        <div class="chats-top">
+            <div class="chat-tabs">
+                <div class="chat-tab active">AI</div>
+            </div>
+            <div class="chat-header-icons">
+                <i class="ph ph-bell"></i>
+                <i class="ph ph-plus-circle"></i>
+            </div>
+        </div>
+        
+        <div class="chat-list" id="chat-list-container">
+            <!-- СЮДА JS БУДЕТ ВСТАВЛЯТЬ РЕАЛЬНЫЕ ЧАТЫ -->
+            <div class="chat-row" onclick="sendAction('open_support')">
+                <img src="https://ui-avatars.com/api/?name=K&background=ff4b4b&color=fff">
+                <div class="chat-row-info">
+                    <h4>Kippy Support <i class="ph-fill ph-patch-check" style="color: #ff4b4b; font-size: 14px;"></i></h4>
+                    <p>Служба поддержки.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ВНУТРИ ЧАТА (КАК НА 4 СКРИНЕ) -->
+    <div id="tab-chat-inner" class="tab-content chat-inner">
+        <div class="chat-header">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <i class="ph ph-arrow-left" onclick="switchTab('chats')" style="font-size:24px; cursor:pointer;"></i>
+                <div class="chat-header-info">
+                    <img id="chat-avatar" src="https://ui-avatars.com/api/?name=U&background=333&color=fff">
+                    <h4 id="chat-name">Загрузка...</h4>
+                </div>
+            </div>
+            <i class="ph ph-dots-three-vertical" style="font-size:24px;"></i>
+        </div>
+        
+        <div class="chat-messages" id="chat-messages">
+            <div class="empty-state">Начните диалог...</div>
+        </div>
+
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" id="chat-input-field" placeholder="Введите сообщение...">
+            <button class="send-btn" onclick="sendMessageToBot()"><i class="ph ph-arrow-up"></i></button>
+        </div>
+    </div>
+
+    <!-- СОЗДАНИЕ (КАК НА 5 СКРИНЕ) -->
+    <div id="tab-create" class="tab-content create-screen">
+        <div class="create-header">
+            <i class="ph ph-arrow-left" onclick="switchTab('profile')"></i>
+            Создать персонажа
+        </div>
+        
+        <div class="upload-box">
+            <i class="ph ph-image"></i>
+            AI-аватар
+        </div>
+
+        <p class="input-label">Имя персонажа *</p>
+        <input type="text" class="input-field" id="create-name" placeholder="Введите имя (0/60)">
+
+        <p class="input-label">Первое сообщение *</p>
+        <textarea class="input-field" id="create-prompt" rows="3" placeholder="Придумайте первые слова, с которых ваш AI будет начинать каждый чат."></textarea>
+
+        <p class="input-label">Кто может это видеть?</p>
+        <div class="visibility-options">
+            <div class="vis-option active">
+                <h4>Публичный</h4>
+                <p>Любой может найти и использовать</p>
+            </div>
+            <div class="vis-option">
+                <h4>Личный</h4>
+                <p>Только у вас есть доступ</p>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn-action" style="background: transparent; border: 1px solid var(--border); color: white; box-shadow: none; flex: 1;">Сохранить</button>
+            <button class="btn-action" style="flex: 2;" onclick="createBot()">Опубликовать</button>
+        </div>
+    </div>
+
+    <!-- НИЖНЕЕ МЕНЮ -->
+    <div class="bottom-nav">
+        <div class="nav-item" id="nav-search" onclick="switchTab('search')"><i class="ph ph-house"></i></div>
+        <div class="nav-item" id="nav-chats" onclick="switchTab('chats')"><i class="ph ph-chat-circle-dots"></i></div>
+        <div class="nav-plus" onclick="switchTab('create')"><i class="ph ph-plus"></i></div>
+        <div class="nav-item active" id="nav-profile" onclick="switchTab('profile')"><i class="ph ph-user"></i></div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.setHeaderColor('#000000');
+        tg.setBackgroundColor('#000000');
+
+        // Данные из профиля Telegram
+        const user = tg.initDataUnsafe?.user;
+        if (user) {
+            document.getElementById('prof-name').innerHTML = `${user.first_name || "Пользователь"} <i class="ph ph-pencil-simple"></i>`;
+            document.getElementById('prof-username').innerText = user.username ? '@' + user.username : 'ID: ' + user.id;
+            if (user.photo_url) {
+                document.getElementById('prof-avatar').src = user.photo_url;
+                document.getElementById('prof-avatar').style.display = 'block';
+                document.getElementById('prof-initial').style.display = 'none';
+            } else {
+                document.getElementById('prof-initial').innerText = (user.first_name || "U").charAt(0);
+            }
+        }
+
+        // Отправка сигналов боту
+        function sendAction(action, payload = null) {
+            tg.HapticFeedback.impactOccurred('light');
+            const data = { action: action };
+            if (payload) data.payload = payload;
+            tg.sendData(JSON.stringify(data));
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            if(tabId === 'profile') document.getElementById('nav-profile').classList.add('active');
+            if(tabId === 'chats' || tabId === 'chat-inner') document.getElementById('nav-chats').classList.add('active');
+            if(tabId === 'search') document.getElementById('nav-search').classList.add('active');
+        }
+
+        function createBot() {
+            const name = document.getElementById('create-name').value;
+            const prompt = document.getElementById('create-prompt').value;
+            
+            if(!name || !prompt) {
+                return tg.showAlert("Заполните имя и описание!");
+            }
+            
+            sendAction('create_bot', { name: name, prompt: prompt });
+            tg.showAlert('Запрос отправлен!');
+            switchTab('profile');
+        }
+    </script>
+</body>
+</html>
